@@ -107,7 +107,7 @@ The application requires the following environment variables to connect to the S
 Run the following command to start the Next.js development server with Fast Refresh.
 ```sh
 npm run dev
-
+```
 Open http://localhost:3000 in your browser to see the application.
 Production Build
 To create an optimized production build, run:
