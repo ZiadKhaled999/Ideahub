@@ -6,12 +6,16 @@ import { Button } from '@/components/ui/button';
 import { IdeaForm } from './IdeaForm';
 import { IdeaGrid } from './IdeaGrid';
 import { SearchAndFilters } from './SearchAndFilters';
+import { UserProfile } from './UserProfile';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const IdeaHub = () => {
+  const { profile } = useAuth();
   const {
     ideas,
     allIdeas,
+    loading,
     searchQuery,
     setSearchQuery,
     statusFilter,
@@ -76,17 +80,22 @@ export const IdeaHub = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Idea Hub</h1>
-                <p className="text-sm text-muted-foreground">Your personal app idea tracker</p>
+                <p className="text-sm text-muted-foreground">
+                  Welcome back, {profile?.display_name || 'Creative Thinker'}!
+                </p>
               </div>
             </div>
             
-            <Button 
-              onClick={() => setIsFormOpen(true)}
-              className="bg-gradient-primary hover:shadow-glow transition-all duration-300 h-11 px-6"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Idea
-            </Button>
+            <div className="flex items-center gap-4">
+              <Button 
+                onClick={() => setIsFormOpen(true)}
+                className="bg-gradient-primary hover:shadow-glow transition-all duration-300 h-11 px-6"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Idea
+              </Button>
+              <UserProfile />
+            </div>
           </div>
         </div>
       </header>
@@ -168,11 +177,20 @@ export const IdeaHub = () => {
         </div>
 
         {/* Ideas Grid */}
-        <IdeaGrid
-          ideas={ideas}
-          onEditIdea={handleEditIdea}
-          onDeleteIdea={handleDeleteIdea}
-        />
+        {loading ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-primary flex items-center justify-center animate-pulse">
+              <Brain className="w-8 h-8 text-white" />
+            </div>
+            <p className="text-muted-foreground">Loading your brilliant ideas...</p>
+          </div>
+        ) : (
+          <IdeaGrid
+            ideas={ideas}
+            onEditIdea={handleEditIdea}
+            onDeleteIdea={handleDeleteIdea}
+          />
+        )}
       </main>
 
       {/* Idea Form Modal */}

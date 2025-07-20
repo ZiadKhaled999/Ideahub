@@ -1,72 +1,62 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Idea, IdeaStatus, IdeaColor } from '@/types/idea';
-
-// Mock data for demonstration
-const mockIdeas: Idea[] = [
-  {
-    id: '1',
-    userId: 'user1',
-    title: 'AI-Powered Recipe Finder',
-    description: 'An app that suggests recipes based on ingredients you have at home using AI image recognition',
-    status: 'idea',
-    tags: ['AI', 'Food', 'Mobile'],
-    color: 'yellow',
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-15')
-  },
-  {
-    id: '2',
-    userId: 'user1',
-    title: 'Personal Finance Tracker',
-    description: 'A beautiful, privacy-focused finance app that categorizes expenses automatically and provides insights without connecting to banks',
-    status: 'research',
-    tags: ['Finance', 'Privacy', 'SaaS'],
-    color: 'green',
-    createdAt: new Date('2024-01-10'),
-    updatedAt: new Date('2024-01-12')
-  },
-  {
-    id: '3',
-    userId: 'user1',
-    title: 'Habit Builder Game',
-    description: 'Gamify habit building with RPG elements - level up your character by completing real-world habits and goals',
-    status: 'progress',
-    tags: ['Gaming', 'Productivity', 'Mobile'],
-    color: 'purple',
-    createdAt: new Date('2024-01-05'),
-    updatedAt: new Date('2024-01-18')
-  },
-  {
-    id: '4',
-    userId: 'user1',
-    title: 'Local Event Discovery',
-    description: 'Help people discover cool local events, workshops, and meetups happening in their neighborhood',
-    status: 'launched',
-    tags: ['Social', 'Local', 'Web'],
-    color: 'blue',
-    createdAt: new Date('2023-12-20'),
-    updatedAt: new Date('2024-01-20')
-  },
-  {
-    id: '5',
-    userId: 'user1',
-    title: 'Voice Note Organizer',
-    description: 'An app that transcribes voice notes, automatically categorizes them, and makes them searchable',
-    status: 'idea',
-    tags: ['AI', 'Productivity', 'Voice'],
-    color: 'pink',
-    createdAt: new Date('2024-01-18'),
-    updatedAt: new Date('2024-01-18')
-  }
-];
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const useIdeas = () => {
-  const [ideas, setIdeas] = useState<Idea[]>(mockIdeas);
+  const { user } = useAuth();
+  const [allIdeas, setAllIdeas] = useState<Idea[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<IdeaStatus | 'all'>('all');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  const filteredIdeas = ideas.filter(idea => {
+  // Fetch ideas from Supabase
+  const fetchIdeas = async () => {
+    if (!user) {
+      setAllIdeas([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('ideas')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching ideas:', error);
+        return;
+      }
+
+      const formattedIdeas: Idea[] = data.map(idea => ({
+        id: idea.id,
+        userId: idea.user_id,
+        title: idea.title,
+        description: idea.description || '',
+        status: idea.status as Idea['status'],
+        tags: idea.tags || [],
+        color: idea.color as Idea['color'],
+        createdAt: new Date(idea.created_at),
+        updatedAt: new Date(idea.updated_at),
+      }));
+
+      setAllIdeas(formattedIdeas);
+    } catch (error) {
+      console.error('Error fetching ideas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchIdeas();
+  }, [user]);
+
+  // Filter ideas based on search and filters
+  const filteredIdeas = allIdeas.filter(idea => {
     const matchesSearch = idea.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          idea.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || idea.status === statusFilter;
@@ -76,34 +66,116 @@ export const useIdeas = () => {
     return matchesSearch && matchesStatus && matchesTags;
   });
 
-  const addIdea = useCallback((newIdea: Omit<Idea, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
-    const idea: Idea = {
-      ...newIdea,
-      id: Math.random().toString(36).substr(2, 9),
-      userId: 'user1',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    setIdeas(prev => [idea, ...prev]);
-  }, []);
+  const addIdea = useCallback(async (newIdea: Omit<Idea, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
 
-  const updateIdea = useCallback((id: string, updates: Partial<Idea>) => {
-    setIdeas(prev => prev.map(idea => 
-      idea.id === id 
-        ? { ...idea, ...updates, updatedAt: new Date() }
-        : idea
-    ));
-  }, []);
+    try {
+      const { data, error } = await supabase
+        .from('ideas')
+        .insert({
+          user_id: user.id,
+          title: newIdea.title,
+          description: newIdea.description,
+          status: newIdea.status,
+          tags: newIdea.tags,
+          color: newIdea.color,
+        })
+        .select()
+        .single();
 
-  const deleteIdea = useCallback((id: string) => {
-    setIdeas(prev => prev.filter(idea => idea.id !== id));
-  }, []);
+      if (error) {
+        console.error('Error adding idea:', error);
+        return;
+      }
 
-  const allTags = Array.from(new Set(ideas.flatMap(idea => idea.tags))).sort();
+      const formattedIdea: Idea = {
+        id: data.id,
+        userId: data.user_id,
+        title: data.title,
+        description: data.description || '',
+        status: data.status as Idea['status'],
+        tags: data.tags || [],
+        color: data.color as Idea['color'],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      };
+
+      setAllIdeas(prev => [formattedIdea, ...prev]);
+    } catch (error) {
+      console.error('Error adding idea:', error);
+    }
+  }, [user]);
+
+  const updateIdea = useCallback(async (id: string, updates: Partial<Idea>) => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('ideas')
+        .update({
+          title: updates.title,
+          description: updates.description,
+          status: updates.status,
+          tags: updates.tags,
+          color: updates.color,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating idea:', error);
+        return;
+      }
+
+      const formattedIdea: Idea = {
+        id: data.id,
+        userId: data.user_id,
+        title: data.title,
+        description: data.description || '',
+        status: data.status as Idea['status'],
+        tags: data.tags || [],
+        color: data.color as Idea['color'],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      };
+
+      setAllIdeas(prev => prev.map(idea => 
+        idea.id === id ? formattedIdea : idea
+      ));
+    } catch (error) {
+      console.error('Error updating idea:', error);
+    }
+  }, [user]);
+
+  const deleteIdea = useCallback(async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('ideas')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error deleting idea:', error);
+        return;
+      }
+
+      setAllIdeas(prev => prev.filter(idea => idea.id !== id));
+    } catch (error) {
+      console.error('Error deleting idea:', error);
+    }
+  }, [user]);
+
+  const allTags = Array.from(new Set(allIdeas.flatMap(idea => idea.tags))).sort();
 
   return {
     ideas: filteredIdeas,
-    allIdeas: ideas,
+    allIdeas,
+    loading,
     searchQuery,
     setSearchQuery,
     statusFilter,
