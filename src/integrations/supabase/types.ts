@@ -20,6 +20,8 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          image_url: string | null
+          original_description: string | null
           status: string
           tags: string[] | null
           title: string
@@ -31,6 +33,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          image_url?: string | null
+          original_description?: string | null
           status?: string
           tags?: string[] | null
           title: string
@@ -42,6 +46,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          image_url?: string | null
+          original_description?: string | null
           status?: string
           tags?: string[] | null
           title?: string
@@ -72,6 +78,42 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          ai_description_enhancement: boolean | null
+          auto_image_generation: boolean | null
+          created_at: string
+          developer_mode: boolean | null
+          id: string
+          markdown_preview: boolean | null
+          theme: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_description_enhancement?: boolean | null
+          auto_image_generation?: boolean | null
+          created_at?: string
+          developer_mode?: boolean | null
+          id?: string
+          markdown_preview?: boolean | null
+          theme?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_description_enhancement?: boolean | null
+          auto_image_generation?: boolean | null
+          created_at?: string
+          developer_mode?: boolean | null
+          id?: string
+          markdown_preview?: boolean | null
+          theme?: string | null
           updated_at?: string
           user_id?: string
         }

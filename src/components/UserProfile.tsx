@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 
 export const UserProfile = () => {
   const { user, profile, signOut } = useAuth();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleSignOut = async () => {

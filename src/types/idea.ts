@@ -8,6 +8,8 @@ export interface Idea {
   color: IdeaColor;
   createdAt: Date;
   updatedAt: Date;
+  image_url?: string;
+  original_description?: string;
 }
 
 export type IdeaStatus = 'idea' | 'research' | 'progress' | 'launched' | 'archived';
