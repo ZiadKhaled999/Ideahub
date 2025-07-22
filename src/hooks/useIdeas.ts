@@ -39,6 +39,8 @@ export const useIdeas = () => {
         status: idea.status as Idea['status'],
         tags: idea.tags || [],
         color: idea.color as Idea['color'],
+        image_url: idea.image_url,
+        original_description: idea.original_description,
         createdAt: new Date(idea.created_at),
         updatedAt: new Date(idea.updated_at),
       }));
@@ -66,7 +68,7 @@ export const useIdeas = () => {
     return matchesSearch && matchesStatus && matchesTags;
   });
 
-  const addIdea = useCallback(async (newIdea: Omit<Idea, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+  const addIdea = useCallback(async (newIdea: Omit<Idea, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'image_url' | 'original_description'>) => {
     if (!user) return;
 
     try {
@@ -96,6 +98,8 @@ export const useIdeas = () => {
         status: data.status as Idea['status'],
         tags: data.tags || [],
         color: data.color as Idea['color'],
+        image_url: data.image_url,
+        original_description: data.original_description,
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at),
       };
@@ -137,6 +141,8 @@ export const useIdeas = () => {
         status: data.status as Idea['status'],
         tags: data.tags || [],
         color: data.color as Idea['color'],
+        image_url: data.image_url,
+        original_description: data.original_description,
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at),
       };

@@ -1,17 +1,28 @@
-import { useState } from 'react';
-import { Plus, Lightbulb, Brain, Rocket } from 'lucide-react';
-import { useIdeas } from '@/hooks/useIdeas';
-import { Idea } from '@/types/idea';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { IdeaForm } from './IdeaForm';
-import { IdeaGrid } from './IdeaGrid';
-import { SearchAndFilters } from './SearchAndFilters';
-import { UserProfile } from './UserProfile';
-import { useToast } from '@/hooks/use-toast';
+import { Plus, Grid3x3, List, Search } from 'lucide-react';
+import { useIdeas } from '@/hooks/useIdeas';
+import { UserProfile } from '@/components/UserProfile';
+import { IdeaForm } from '@/components/IdeaForm';
+import { SearchAndFilters } from '@/components/SearchAndFilters';
+import { PremiumIdeaCard } from '@/components/ideas/PremiumIdeaCard';
+import { IdeaPreviewModal } from '@/components/ideas/IdeaPreviewModal';
+import { Idea } from '@/types/idea';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+
+interface UserSettings {
+  auto_image_generation: boolean;
+  ai_description_enhancement: boolean;
+  markdown_preview: boolean;
+  developer_mode: boolean;
+  theme: string;
+}
 
 export const IdeaHub = () => {
-  const { profile } = useAuth();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const {
     ideas,
     allIdeas,
@@ -30,177 +41,231 @@ export const IdeaHub = () => {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
-  const { toast } = useToast();
+  const [previewIdea, setPreviewIdea] = useState<Idea | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [settings, setSettings] = useState<UserSettings>({
+    auto_image_generation: false,
+    ai_description_enhancement: false,
+    markdown_preview: true,
+    developer_mode: false,
+    theme: 'system'
+  });
 
-  const handleAddIdea = (newIdea: Omit<Idea, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
-    addIdea(newIdea);
+  // Load user settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+
+        if (data) {
+          setSettings({
+            auto_image_generation: data.auto_image_generation,
+            ai_description_enhancement: data.ai_description_enhancement,
+            markdown_preview: data.markdown_preview,
+            developer_mode: data.developer_mode,
+            theme: data.theme
+          });
+        }
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    };
+
+    loadSettings();
+  }, [user]);
+
+  const handleAddIdea = async (newIdea: Omit<Idea, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'image_url' | 'original_description'>) => {
+    await addIdea(newIdea);
+    setIsFormOpen(false);
+    
     toast({
-      title: "Idea added! 💡",
-      description: "Your new idea has been saved to the hub.",
+      title: "Idea created! 🎉",
+      description: settings.auto_image_generation ? 
+        "AI image generation will start shortly." : 
+        "Your idea has been saved successfully.",
     });
   };
 
-  const handleUpdateIdea = (id: string, updates: Partial<Idea>) => {
-    updateIdea(id, updates);
+  const handleEditIdea = async (id: string, updates: Partial<Idea>) => {
+    await updateIdea(id, updates);
     setEditingIdea(null);
-    toast({
-      title: "Idea updated! ✨",
-      description: "Your changes have been saved.",
-    });
   };
 
-  const handleDeleteIdea = (id: string) => {
-    deleteIdea(id);
+  const handleDeleteIdea = async (id: string) => {
+    await deleteIdea(id);
     toast({
       title: "Idea deleted",
-      description: "The idea has been removed from your hub.",
-      variant: "destructive",
+      description: "Your idea has been removed.",
     });
   };
 
-  const handleEditIdea = (idea: Idea) => {
+  const openEditForm = (idea: Idea) => {
     setEditingIdea(idea);
     setIsFormOpen(true);
   };
 
-  const handleCloseForm = () => {
+  const closeForm = () => {
     setIsFormOpen(false);
     setEditingIdea(null);
   };
 
+  const openPreview = (idea: Idea) => {
+    setPreviewIdea(idea);
+  };
+
+  const closePreview = () => {
+    setPreviewIdea(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-primary flex items-center justify-center animate-pulse">
+            <Plus className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-muted-foreground">Loading your ideas...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-background">
+    <div className="min-h-screen bg-gradient-subtle">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-md border-b border-border/50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow">
-                <Brain className="h-5 w-5 text-white" />
+      <header className="sticky top-0 z-40 w-full border-b bg-card-header/95 backdrop-blur supports-[backdrop-filter]:bg-card-header/60">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                <Plus className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Idea Hub</h1>
-                <p className="text-sm text-muted-foreground">
-                  Welcome back, {profile?.display_name || 'Creative Thinker'}!
-                </p>
-              </div>
+              <h1 className="text-xl font-bold bg-gradient-text bg-clip-text text-transparent">
+                Idea Hub
+              </h1>
             </div>
             
             <div className="flex items-center gap-4">
-              <Button 
-                onClick={() => setIsFormOpen(true)}
-                className="bg-gradient-primary hover:shadow-glow transition-all duration-300 h-11 px-6"
-              >
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="hidden sm:flex"
+                >
+                  <Grid3x3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="hidden sm:flex"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <Button onClick={() => setIsFormOpen(true)} className="shadow-elegant">
                 <Plus className="h-4 w-4 mr-2" />
                 New Idea
               </Button>
+              
               <UserProfile />
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-card rounded-xl p-4 border border-border/50 shadow-card">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center">
-                <Lightbulb className="h-4 w-4 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {allIdeas.filter(i => i.status === 'idea').length}
-                </p>
-                <p className="text-xs text-muted-foreground">Ideas</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-card rounded-xl p-4 border border-border/50 shadow-card">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Brain className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {allIdeas.filter(i => i.status === 'research').length}
-                </p>
-                <p className="text-xs text-muted-foreground">Research</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-card rounded-xl p-4 border border-border/50 shadow-card">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                <Plus className="h-4 w-4 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {allIdeas.filter(i => i.status === 'progress').length}
-                </p>
-                <p className="text-xs text-muted-foreground">In Progress</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-card rounded-xl p-4 border border-border/50 shadow-card">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                <Rocket className="h-4 w-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {allIdeas.filter(i => i.status === 'launched').length}
-                </p>
-                <p className="text-xs text-muted-foreground">Launched</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Search and Filters */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <SearchAndFilters
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          selectedTags={selectedTags}
+          onTagsChange={setSelectedTags}
+          allTags={allTags}
+          totalCount={allIdeas.length}
+          filteredCount={ideas.length}
+        />
+      </div>
 
-        {/* Search and Filters */}
-        <div className="mb-8">
-          <SearchAndFilters
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            selectedTags={selectedTags}
-            onTagsChange={setSelectedTags}
-            allTags={allTags}
-            totalCount={allIdeas.length}
-            filteredCount={ideas.length}
-          />
-        </div>
-
-        {/* Ideas Grid */}
-        {loading ? (
+      {/* Ideas Grid/List */}
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        {ideas.length === 0 ? (
           <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-primary flex items-center justify-center animate-pulse">
-              <Brain className="w-8 h-8 text-white" />
+            <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-primary/10 flex items-center justify-center">
+              <Search className="w-12 h-12 text-muted-foreground" />
             </div>
-            <p className="text-muted-foreground">Loading your brilliant ideas...</p>
+            <h2 className="text-2xl font-semibold text-foreground mb-2">
+              {searchQuery || statusFilter !== 'all' || selectedTags.length > 0 
+                ? 'No ideas match your filters' 
+                : 'No ideas yet'
+              }
+            </h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              {searchQuery || statusFilter !== 'all' || selectedTags.length > 0
+                ? 'Try adjusting your search or filters to find what you\'re looking for.'
+                : 'Start capturing your brilliant app ideas and organize them like never before.'
+              }
+            </p>
+            <Button onClick={() => setIsFormOpen(true)} className="shadow-elegant">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your First Idea
+            </Button>
           </div>
         ) : (
-          <IdeaGrid
-            ideas={ideas}
-            onEditIdea={handleEditIdea}
-            onDeleteIdea={handleDeleteIdea}
-          />
+          <div className={`${
+            viewMode === 'grid' 
+              ? 'columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4' 
+              : 'space-y-4 max-w-4xl mx-auto'
+          }`}>
+            {ideas.map((idea) => (
+              <PremiumIdeaCard
+                key={idea.id}
+                idea={idea}
+                onEdit={openEditForm}
+                onDelete={handleDeleteIdea}
+                onPreview={openPreview}
+                settings={settings}
+              />
+            ))}
+          </div>
         )}
       </main>
 
-      {/* Idea Form Modal */}
+      {/* Modals */}
       <IdeaForm
         isOpen={isFormOpen}
-        onClose={handleCloseForm}
+        onClose={closeForm}
         onSubmit={handleAddIdea}
-        onUpdate={handleUpdateIdea}
+        onUpdate={editingIdea ? 
+          (id, updates) => handleEditIdea(id, updates) : 
+          undefined
+        }
         editingIdea={editingIdea}
       />
+
+      {previewIdea && (
+        <IdeaPreviewModal
+          idea={previewIdea}
+          isOpen={!!previewIdea}
+          onClose={closePreview}
+          onEdit={openEditForm}
+          settings={settings}
+        />
+      )}
     </div>
   );
 };
