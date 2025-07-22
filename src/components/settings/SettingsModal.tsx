@@ -85,11 +85,16 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     try {
       const { error } = await supabase
         .from('user_settings')
-        .upsert({
-          user_id: user?.id,
-          ...settings,
-          ...newSettings,
-        });
+        .upsert(
+          {
+            user_id: user?.id,
+            ...settings,
+            ...newSettings,
+          },
+          {
+            onConflict: 'user_id'
+          }
+        );
 
       if (error) throw error;
 
