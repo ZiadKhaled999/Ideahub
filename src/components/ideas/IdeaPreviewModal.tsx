@@ -53,19 +53,22 @@ export const IdeaPreviewModal = ({
     
     setIsEnhancingDescription(true);
     try {
-      const apiKey = settings.developer_mode ? sessionStorage.getItem('dev_deepseek_key') : null;
+      const apiKey = settings.developer_mode ? sessionStorage.getItem('dev_deepseek_key') : undefined;
       
       const { data, error } = await supabase.functions.invoke('enhance-description', {
         body: { 
           title: idea.title,
           description: idea.description,
-          apiKey
+          ...(apiKey && { apiKey })
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error('Failed to enhance prompt. Please check your API configuration.');
+      }
 
-      if (data.success) {
+      if (data?.success && data?.enhancedDescription) {
         const { error: updateError } = await supabase
           .from('ideas')
           .update({ 
@@ -83,12 +86,14 @@ export const IdeaPreviewModal = ({
         
         // Refresh the modal data
         window.location.reload();
+      } else {
+        throw new Error(data?.error || 'Failed to enhance description');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error enhancing description:', error);
       toast({
-        title: "Enhancement failed",
-        description: "Please try again or check your API configuration.",
+        title: "Failed to enhance prompt",
+        description: "Please check your API configuration.",
         variant: "destructive",
       });
     } finally {
@@ -132,18 +137,21 @@ export const IdeaPreviewModal = ({
     
     setIsGeneratingImage(true);
     try {
-      const apiKey = settings.developer_mode ? sessionStorage.getItem('dev_google_ai_key') : null;
+      const apiKey = settings.developer_mode ? sessionStorage.getItem('dev_google_ai_key') : undefined;
       
       const { data, error } = await supabase.functions.invoke('generate-image', {
         body: { 
           prompt: `Create a beautiful, professional illustration for an app idea: ${idea.title}. ${idea.description.substring(0, 200)}`,
-          apiKey
+          ...(apiKey && { apiKey })
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error('Failed to generate image. Please check your API configuration.');
+      }
 
-      if (data.success) {
+      if (data?.success && data?.imageUrl) {
         const { error: updateError } = await supabase
           .from('ideas')
           .update({ image_url: data.imageUrl })
@@ -158,12 +166,14 @@ export const IdeaPreviewModal = ({
         
         // Refresh the modal data
         window.location.reload();
+      } else {
+        throw new Error(data?.error || 'Failed to generate image');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating image:', error);
       toast({
-        title: "Image generation failed",
-        description: "Please try again or check your API configuration.",
+        title: "Failed to generate",
+        description: "Please check your API configuration.",
         variant: "destructive",
       });
     } finally {
@@ -173,28 +183,29 @@ export const IdeaPreviewModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="space-y-4">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-bold">{idea.title}</DialogTitle>
-            <div className="flex items-center gap-2">
-              <Badge 
-                variant="secondary" 
-                className={`${statusStyle.color} border-0`}
-              >
-                {statusStyle.label}
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onEdit(idea)}
-              >
-                <Edit3 className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+        <div className="p-6">
+          <DialogHeader className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <DialogTitle className="text-xl sm:text-2xl font-bold break-words pr-4">{idea.title}</DialogTitle>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Badge 
+                  variant="secondary" 
+                  className={`${statusStyle.color} border-0`}
+                >
+                  {statusStyle.label}
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEdit(idea)}
+                >
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              </div>
             </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
 
         <div className="space-y-6">
           {/* Image */}
@@ -256,11 +267,39 @@ export const IdeaPreviewModal = ({
               </div>
             </div>
             
-            <div className="prose prose-gray max-w-none dark:prose-invert">
+            <div className="prose prose-gray max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-em:text-muted-foreground prose-code:text-foreground prose-pre:text-foreground prose-blockquote:text-muted-foreground prose-li:text-muted-foreground break-words">
               {settings.markdown_preview ? (
-                <ReactMarkdown>{idea.description}</ReactMarkdown>
+                <ReactMarkdown
+                  components={{
+                    h1: ({children}) => <h1 className="text-2xl font-bold mb-4 text-foreground break-words">{children}</h1>,
+                    h2: ({children}) => <h2 className="text-xl font-semibold mb-3 text-foreground break-words">{children}</h2>,
+                    h3: ({children}) => <h3 className="text-lg font-medium mb-2 text-foreground break-words">{children}</h3>,
+                    h4: ({children}) => <h4 className="text-base font-medium mb-2 text-foreground break-words">{children}</h4>,
+                    h5: ({children}) => <h5 className="text-sm font-medium mb-1 text-foreground break-words">{children}</h5>,
+                    h6: ({children}) => <h6 className="text-sm font-medium mb-1 text-foreground break-words">{children}</h6>,
+                    p: ({children}) => <p className="mb-4 text-muted-foreground break-words leading-relaxed">{children}</p>,
+                    strong: ({children}) => <strong className="font-semibold text-foreground">{children}</strong>,
+                    em: ({children}) => <em className="italic text-muted-foreground">{children}</em>,
+                    code: ({children}) => <code className="bg-muted px-2 py-1 rounded text-sm text-foreground font-mono break-words">{children}</code>,
+                    pre: ({children}) => <pre className="bg-muted p-4 rounded-lg overflow-x-auto mb-4 text-sm text-foreground font-mono">{children}</pre>,
+                    blockquote: ({children}) => <blockquote className="border-l-4 border-border pl-4 mb-4 text-muted-foreground italic">{children}</blockquote>,
+                    ul: ({children}) => <ul className="list-disc list-inside mb-4 space-y-2 text-muted-foreground">{children}</ul>,
+                    ol: ({children}) => <ol className="list-decimal list-inside mb-4 space-y-2 text-muted-foreground">{children}</ol>,
+                    li: ({children}) => <li className="text-muted-foreground break-words">{children}</li>,
+                    a: ({children, href}) => <a href={href} className="text-primary hover:underline break-all" target="_blank" rel="noopener noreferrer">{children}</a>,
+                    table: ({children}) => <div className="overflow-x-auto mb-4"><table className="min-w-full border border-border">{children}</table></div>,
+                    thead: ({children}) => <thead className="bg-muted">{children}</thead>,
+                    tbody: ({children}) => <tbody>{children}</tbody>,
+                    tr: ({children}) => <tr className="border-b border-border">{children}</tr>,
+                    th: ({children}) => <th className="px-4 py-2 text-left font-semibold text-foreground">{children}</th>,
+                    td: ({children}) => <td className="px-4 py-2 text-muted-foreground break-words">{children}</td>,
+                    hr: () => <hr className="my-6 border-border" />,
+                  }}
+                >
+                  {idea.description}
+                </ReactMarkdown>
               ) : (
-                <p className="whitespace-pre-wrap">{idea.description}</p>
+                <p className="whitespace-pre-wrap break-words text-muted-foreground leading-relaxed">{idea.description}</p>
               )}
             </div>
           </div>
@@ -301,6 +340,7 @@ export const IdeaPreviewModal = ({
               <span>Updated: {formatDate(idea.updatedAt)}</span>
             </div>
           </div>
+        </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -95,18 +95,21 @@ export const PremiumIdeaCard = ({
     
     setIsGeneratingImage(true);
     try {
-      const apiKey = settings.developer_mode ? sessionStorage.getItem('dev_google_ai_key') : null;
+      const apiKey = settings.developer_mode ? sessionStorage.getItem('dev_google_ai_key') : undefined;
       
       const { data, error } = await supabase.functions.invoke('generate-image', {
         body: { 
           prompt: `Create a beautiful, professional illustration for an app idea: ${idea.title}. ${idea.description.substring(0, 200)}`,
-          apiKey
+          ...(apiKey && { apiKey })
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error('Failed to generate image. Please check your API configuration.');
+      }
 
-      if (data.success) {
+      if (data?.success && data?.imageUrl) {
         // Update the idea with the generated image
         const { error: updateError } = await supabase
           .from('ideas')
@@ -119,12 +122,17 @@ export const PremiumIdeaCard = ({
           title: "Image generated! 🎨",
           description: "A beautiful image has been created for your idea.",
         });
+        
+        // Refresh the page to show the new image
+        window.location.reload();
+      } else {
+        throw new Error(data?.error || 'Failed to generate image');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating image:', error);
       toast({
-        title: "Image generation failed",
-        description: "Please try again or check your API configuration.",
+        title: "Failed to generate",
+        description: "Please check your API configuration.",
         variant: "destructive",
       });
     } finally {
@@ -137,19 +145,22 @@ export const PremiumIdeaCard = ({
     
     setIsEnhancingDescription(true);
     try {
-      const apiKey = settings.developer_mode ? sessionStorage.getItem('dev_deepseek_key') : null;
+      const apiKey = settings.developer_mode ? sessionStorage.getItem('dev_deepseek_key') : undefined;
       
       const { data, error } = await supabase.functions.invoke('enhance-description', {
         body: { 
           title: idea.title,
           description: idea.description,
-          apiKey
+          ...(apiKey && { apiKey })
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error('Failed to enhance prompt. Please check your API configuration.');
+      }
 
-      if (data.success) {
+      if (data?.success && data?.enhancedDescription) {
         // Store original description and update with enhanced one
         const { error: updateError } = await supabase
           .from('ideas')
@@ -165,12 +176,17 @@ export const PremiumIdeaCard = ({
           title: "Description enhanced! ✨",
           description: "Your idea description has been improved with AI insights.",
         });
+        
+        // Refresh the page to show the enhanced description
+        window.location.reload();
+      } else {
+        throw new Error(data?.error || 'Failed to enhance description');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error enhancing description:', error);
       toast({
-        title: "Enhancement failed",
-        description: "Please try again or check your API configuration.",
+        title: "Failed to enhance prompt",
+        description: "Please check your API configuration.",
         variant: "destructive",
       });
     } finally {
@@ -318,13 +334,27 @@ export const PremiumIdeaCard = ({
         {/* Description Preview */}
         <div className="text-sm text-muted-foreground mb-4 leading-relaxed">
           {settings.markdown_preview ? (
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown>
-                {truncateDescription(idea.description)}
+            <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-em:text-muted-foreground prose-code:text-foreground prose-pre:text-foreground prose-blockquote:text-muted-foreground prose-li:text-muted-foreground overflow-hidden">
+              <ReactMarkdown
+                components={{
+                  h1: ({children}) => <h1 className="text-base font-semibold mb-2 text-foreground">{children}</h1>,
+                  h2: ({children}) => <h2 className="text-sm font-semibold mb-1 text-foreground">{children}</h2>,
+                  h3: ({children}) => <h3 className="text-sm font-medium mb-1 text-foreground">{children}</h3>,
+                  p: ({children}) => <p className="text-sm mb-2 text-muted-foreground break-words">{children}</p>,
+                  strong: ({children}) => <strong className="font-semibold text-foreground">{children}</strong>,
+                  em: ({children}) => <em className="italic text-muted-foreground">{children}</em>,
+                  code: ({children}) => <code className="bg-muted px-1 py-0.5 rounded text-xs text-foreground">{children}</code>,
+                  blockquote: ({children}) => <blockquote className="border-l-2 border-border pl-2 text-sm text-muted-foreground">{children}</blockquote>,
+                  ul: ({children}) => <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">{children}</ul>,
+                  ol: ({children}) => <ol className="list-decimal list-inside text-sm space-y-1 text-muted-foreground">{children}</ol>,
+                  li: ({children}) => <li className="text-sm text-muted-foreground">{children}</li>
+                }}
+              >
+                {truncateDescription(idea.description, 150)}
               </ReactMarkdown>
             </div>
           ) : (
-            <p>{truncateDescription(idea.description)}</p>
+            <p className="break-words">{truncateDescription(idea.description, 150)}</p>
           )}
         </div>
 

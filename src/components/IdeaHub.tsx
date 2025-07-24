@@ -68,13 +68,28 @@ export const IdeaHub = () => {
         }
 
         if (data) {
-          setSettings({
+          const loadedSettings = {
             auto_image_generation: data.auto_image_generation,
             ai_description_enhancement: data.ai_description_enhancement,
             markdown_preview: data.markdown_preview,
             developer_mode: data.developer_mode,
             theme: data.theme
-          });
+          };
+          setSettings(loadedSettings);
+          
+          // Apply theme on load
+          const root = window.document.documentElement;
+          root.classList.remove('light', 'dark');
+          
+          if (loadedSettings.theme === 'light') {
+            root.classList.add('light');
+          } else if (loadedSettings.theme === 'dark') {
+            root.classList.add('dark');
+          } else {
+            // System theme - detect and apply
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            root.classList.add(systemTheme);
+          }
         }
       } catch (error) {
         console.error('Error loading settings:', error);

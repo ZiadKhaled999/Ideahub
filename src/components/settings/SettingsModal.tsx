@@ -62,13 +62,36 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
       }
 
       if (data) {
-        setSettings({
+        const loadedSettings = {
           auto_image_generation: data.auto_image_generation,
           ai_description_enhancement: data.ai_description_enhancement,
           markdown_preview: data.markdown_preview,
           developer_mode: data.developer_mode,
           theme: data.theme
-        });
+        };
+        setSettings(loadedSettings);
+        
+        // Apply theme on load
+        const root = window.document.documentElement;
+        root.classList.remove('light', 'dark');
+        
+        if (loadedSettings.theme === 'light') {
+          root.classList.add('light');
+        } else if (loadedSettings.theme === 'dark') {
+          root.classList.add('dark');
+        } else {
+          // System theme - detect and apply
+          const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          root.classList.add(systemTheme);
+        }
+        
+        // Load API keys from session storage if in developer mode
+        if (loadedSettings.developer_mode) {
+          setDevApiKeys({
+            googleAI: sessionStorage.getItem('dev_google_ai_key') || '',
+            deepseek: sessionStorage.getItem('dev_deepseek_key') || ''
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -116,6 +139,22 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   };
 
   const handleSettingChange = (key: keyof UserSettings, value: boolean | string) => {
+    // Apply theme changes immediately
+    if (key === 'theme') {
+      const root = window.document.documentElement;
+      root.classList.remove('light', 'dark');
+      
+      if (value === 'light') {
+        root.classList.add('light');
+      } else if (value === 'dark') {
+        root.classList.add('dark');
+      } else {
+        // System theme - detect and apply
+        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        root.classList.add(systemTheme);
+      }
+    }
+    
     saveSettings({ [key]: value });
   };
 
