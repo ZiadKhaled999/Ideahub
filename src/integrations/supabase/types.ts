@@ -14,45 +14,11 @@ export type Database = {
   }
   public: {
     Tables: {
-      idea_groups: {
-        Row: {
-          color: string
-          created_at: string
-          description: string | null
-          icon: string | null
-          id: string
-          name: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          color?: string
-          created_at?: string
-          description?: string | null
-          icon?: string | null
-          id?: string
-          name: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          color?: string
-          created_at?: string
-          description?: string | null
-          icon?: string | null
-          id?: string
-          name?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       ideas: {
         Row: {
           color: string
           created_at: string
           description: string | null
-          group_id: string | null
           id: string
           image_url: string | null
           original_description: string | null
@@ -66,7 +32,6 @@ export type Database = {
           color?: string
           created_at?: string
           description?: string | null
-          group_id?: string | null
           id?: string
           image_url?: string | null
           original_description?: string | null
@@ -80,7 +45,6 @@ export type Database = {
           color?: string
           created_at?: string
           description?: string | null
-          group_id?: string | null
           id?: string
           image_url?: string | null
           original_description?: string | null
@@ -90,15 +54,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "ideas_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "idea_groups"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       profiles: {
         Row: {

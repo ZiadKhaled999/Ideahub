@@ -10,7 +10,6 @@ export interface Idea {
   updatedAt: Date;
   image_url?: string;
   original_description?: string;
-  group_id?: string;
 }
 
 export type IdeaStatus = 'idea' | 'research' | 'progress' | 'launched' | 'archived';

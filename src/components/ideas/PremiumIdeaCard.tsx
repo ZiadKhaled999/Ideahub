@@ -354,7 +354,7 @@ export const PremiumIdeaCard = ({
               </ReactMarkdown>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground break-words whitespace-pre-wrap leading-relaxed">{truncateDescription(idea.description, 150)}</p>
+            <p className="break-words">{truncateDescription(idea.description, 150)}</p>
           )}
         </div>
 
