@@ -7,7 +7,11 @@ import { IdeaForm } from '@/components/IdeaForm';
 import { SearchAndFilters } from '@/components/SearchAndFilters';
 import { PremiumIdeaCard } from '@/components/ideas/PremiumIdeaCard';
 import { IdeaPreviewModal } from '@/components/ideas/IdeaPreviewModal';
+import { GroupCard } from '@/components/groups/GroupCard';
+import { GroupForm } from '@/components/groups/GroupForm';
+import { useGroups } from '@/hooks/useGroups';
 import { Idea } from '@/types/idea';
+import { IdeaGroup } from '@/types/group';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -42,7 +46,10 @@ export const IdeaHub = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
   const [previewIdea, setPreviewIdea] = useState<Idea | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'groups'>('groups');
+  const [isGroupFormOpen, setIsGroupFormOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<IdeaGroup | null>(null);
+  const [selectedGroupForIdea, setSelectedGroupForIdea] = useState<string | null>(null);
   const [settings, setSettings] = useState<UserSettings>({
     auto_image_generation: false,
     ai_description_enhancement: false,
@@ -50,6 +57,14 @@ export const IdeaHub = () => {
     developer_mode: false,
     theme: 'system'
   });
+
+  const {
+    groups,
+    loading: groupsLoading,
+    addGroup,
+    updateGroup,
+    deleteGroup
+  } = useGroups();
 
   // Load user settings
   useEffect(() => {
@@ -100,8 +115,14 @@ export const IdeaHub = () => {
   }, [user]);
 
   const handleAddIdea = async (newIdea: Omit<Idea, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'image_url' | 'original_description'>) => {
-    await addIdea(newIdea);
+    const ideaWithGroup = {
+      ...newIdea,
+      group_id: selectedGroupForIdea
+    };
+    
+    await addIdea(ideaWithGroup);
     setIsFormOpen(false);
+    setSelectedGroupForIdea(null);
     
     toast({
       title: "Idea created! 🎉",
@@ -142,7 +163,43 @@ export const IdeaHub = () => {
     setPreviewIdea(null);
   };
 
-  if (loading) {
+  const handleAddGroup = async (groupData: Omit<IdeaGroup, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    await addGroup(groupData);
+    setIsGroupFormOpen(false);
+  };
+
+  const handleEditGroup = async (id: string, updates: Partial<IdeaGroup>) => {
+    await updateGroup(id, updates);
+    setEditingGroup(null);
+    setIsGroupFormOpen(false);
+  };
+
+  const openEditGroupForm = (group: IdeaGroup) => {
+    setEditingGroup(group);
+    setIsGroupFormOpen(true);
+  };
+
+  const closeGroupForm = () => {
+    setIsGroupFormOpen(false);
+    setEditingGroup(null);
+  };
+
+  const handleAddIdeaToGroup = (groupId: string) => {
+    setSelectedGroupForIdea(groupId);
+    setIsFormOpen(true);
+  };
+
+  // Group ideas by group_id
+  const groupedIdeas = ideas.reduce((acc, idea) => {
+    const key = idea.group_id || 'ungrouped';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(idea);
+    return acc;
+  }, {} as Record<string, Idea[]>);
+
+  const ungroupedIdeas = groupedIdeas['ungrouped'] || [];
+
+  if (loading || groupsLoading) {
     return (
       <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
         <div className="text-center">
@@ -173,6 +230,14 @@ export const IdeaHub = () => {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Button
+                  variant={viewMode === 'groups' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('groups')}
+                  className="hidden sm:flex"
+                >
+                  📁
+                </Button>
+                <Button
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('grid')}
@@ -190,10 +255,22 @@ export const IdeaHub = () => {
                 </Button>
               </div>
               
-              <Button onClick={() => setIsFormOpen(true)} className="shadow-elegant">
-                <Plus className="h-4 w-4 mr-2" />
-                New Idea
-              </Button>
+              <div className="flex gap-2">
+                {viewMode === 'groups' && (
+                  <Button 
+                    onClick={() => setIsGroupFormOpen(true)} 
+                    variant="outline"
+                    className="shadow-elegant"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Group
+                  </Button>
+                )}
+                <Button onClick={() => setIsFormOpen(true)} className="shadow-elegant">
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Idea
+                </Button>
+              </div>
               
               <UserProfile />
             </div>
@@ -216,9 +293,82 @@ export const IdeaHub = () => {
         />
       </div>
 
-      {/* Ideas Grid/List */}
+      {/* Ideas Grid/List/Groups */}
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {ideas.length === 0 ? (
+        {viewMode === 'groups' ? (
+          <div className="space-y-6">
+            {/* Groups */}
+            {groups.map((group) => (
+              <GroupCard
+                key={group.id}
+                group={group}
+                ideas={groupedIdeas[group.id] || []}
+                onEditGroup={openEditGroupForm}
+                onDeleteGroup={deleteGroup}
+                onEditIdea={openEditForm}
+                onDeleteIdea={handleDeleteIdea}
+                onPreviewIdea={openPreview}
+                onAddIdeaToGroup={handleAddIdeaToGroup}
+                settings={settings}
+              />
+            ))}
+            
+            {/* Ungrouped Ideas */}
+            {ungroupedIdeas.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                    📝
+                  </div>
+                  Ungrouped Ideas
+                  <span className="text-sm text-muted-foreground">({ungroupedIdeas.length})</span>
+                </h2>
+                <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+                  {ungroupedIdeas.map((idea, index) => (
+                    <div
+                      key={idea.id}
+                      className="animate-bounce-in break-inside-avoid"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                      <PremiumIdeaCard
+                        idea={idea}
+                        onEdit={openEditForm}
+                        onDelete={handleDeleteIdea}
+                        onPreview={openPreview}
+                        settings={settings}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Empty State for Groups */}
+            {groups.length === 0 && ungroupedIdeas.length === 0 && (
+              <div className="text-center py-16">
+                <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-primary/10 flex items-center justify-center animate-pulse-glow">
+                  <Plus className="w-12 h-12 text-muted-foreground" />
+                </div>
+                <h2 className="text-2xl font-semibold text-foreground mb-2">
+                  Create Your First Group
+                </h2>
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                  Organize your ideas into groups like your favorite apps. Start by creating a group!
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button onClick={() => setIsGroupFormOpen(true)} className="shadow-elegant animate-wiggle">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create First Group
+                  </Button>
+                  <Button onClick={() => setIsFormOpen(true)} variant="outline">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Idea
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : ideas.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-primary/10 flex items-center justify-center">
               <Search className="w-12 h-12 text-muted-foreground" />
@@ -246,15 +396,20 @@ export const IdeaHub = () => {
               ? 'columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4' 
               : 'space-y-4 max-w-4xl mx-auto'
           }`}>
-            {ideas.map((idea) => (
-              <PremiumIdeaCard
+            {ideas.map((idea, index) => (
+              <div
                 key={idea.id}
-                idea={idea}
-                onEdit={openEditForm}
-                onDelete={handleDeleteIdea}
-                onPreview={openPreview}
-                settings={settings}
-              />
+                className="animate-bounce-in"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <PremiumIdeaCard
+                  idea={idea}
+                  onEdit={openEditForm}
+                  onDelete={handleDeleteIdea}
+                  onPreview={openPreview}
+                  settings={settings}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -281,6 +436,17 @@ export const IdeaHub = () => {
           settings={settings}
         />
       )}
+
+      <GroupForm
+        isOpen={isGroupFormOpen}
+        onClose={closeGroupForm}
+        onSubmit={handleAddGroup}
+        onUpdate={editingGroup ? 
+          (id, updates) => handleEditGroup(id, updates) : 
+          undefined
+        }
+        editingGroup={editingGroup}
+      />
     </div>
   );
 };
