@@ -327,7 +327,7 @@ export const PremiumIdeaCard = ({
         </div>
 
         {/* Title */}
-        <h3 className="text-lg font-semibold text-foreground mb-2 leading-tight">
+        <h3 className="text-lg font-semibold text-foreground mb-2 leading-tight break-words overflow-wrap-anywhere">
           {idea.title}
         </h3>
 
@@ -337,24 +337,24 @@ export const PremiumIdeaCard = ({
             <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-em:text-muted-foreground prose-code:text-foreground prose-pre:text-foreground prose-blockquote:text-muted-foreground prose-li:text-muted-foreground overflow-hidden">
               <ReactMarkdown
                 components={{
-                  h1: ({children}) => <h1 className="text-base font-semibold mb-2 text-foreground">{children}</h1>,
-                  h2: ({children}) => <h2 className="text-sm font-semibold mb-1 text-foreground">{children}</h2>,
-                  h3: ({children}) => <h3 className="text-sm font-medium mb-1 text-foreground">{children}</h3>,
-                  p: ({children}) => <p className="text-sm mb-2 text-muted-foreground break-words">{children}</p>,
-                  strong: ({children}) => <strong className="font-semibold text-foreground">{children}</strong>,
-                  em: ({children}) => <em className="italic text-muted-foreground">{children}</em>,
-                  code: ({children}) => <code className="bg-muted px-1 py-0.5 rounded text-xs text-foreground">{children}</code>,
-                  blockquote: ({children}) => <blockquote className="border-l-2 border-border pl-2 text-sm text-muted-foreground">{children}</blockquote>,
+                  h1: ({children}) => <h1 className="text-base font-semibold mb-2 text-foreground break-words">{children}</h1>,
+                  h2: ({children}) => <h2 className="text-sm font-semibold mb-1 text-foreground break-words">{children}</h2>,
+                  h3: ({children}) => <h3 className="text-sm font-medium mb-1 text-foreground break-words">{children}</h3>,
+                  p: ({children}) => <p className="text-sm mb-2 text-muted-foreground break-words overflow-wrap-anywhere whitespace-pre-wrap">{children}</p>,
+                  strong: ({children}) => <strong className="font-semibold text-foreground break-words">{children}</strong>,
+                  em: ({children}) => <em className="italic text-muted-foreground break-words">{children}</em>,
+                  code: ({children}) => <code className="bg-muted px-1 py-0.5 rounded text-xs text-foreground break-all">{children}</code>,
+                  blockquote: ({children}) => <blockquote className="border-l-2 border-border pl-2 text-sm text-muted-foreground break-words">{children}</blockquote>,
                   ul: ({children}) => <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">{children}</ul>,
                   ol: ({children}) => <ol className="list-decimal list-inside text-sm space-y-1 text-muted-foreground">{children}</ol>,
-                  li: ({children}) => <li className="text-sm text-muted-foreground">{children}</li>
+                  li: ({children}) => <li className="text-sm text-muted-foreground break-words overflow-wrap-anywhere">{children}</li>
                 }}
               >
                 {truncateDescription(idea.description, 150)}
               </ReactMarkdown>
             </div>
           ) : (
-            <p className="break-words">{truncateDescription(idea.description, 150)}</p>
+            <p className="break-words overflow-wrap-anywhere whitespace-pre-wrap">{truncateDescription(idea.description, 150)}</p>
           )}
         </div>
 

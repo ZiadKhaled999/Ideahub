@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Plus, Tag as TagIcon } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Plus, Tag as TagIcon, Upload, Link, Trash2 } from 'lucide-react';
 import { Idea, IdeaStatus, IdeaColor, statusConfig, colorConfig } from '@/types/idea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface IdeaFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (idea: Omit<Idea, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => void;
+  onSubmit: (idea: Omit<Idea, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'image_url' | 'original_description'>) => void;
   onUpdate?: (id: string, updates: Partial<Idea>) => void;
   editingIdea?: Idea | null;
 }
@@ -24,6 +26,12 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
   const [color, setColor] = useState<IdeaColor>('gray');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isScreenshotting, setIsScreenshotting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (editingIdea) {
@@ -32,26 +40,60 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
       setStatus(editingIdea.status);
       setColor(editingIdea.color);
       setTags(editingIdea.tags);
+      setImagePreview(editingIdea.image_url || null);
     } else {
       setTitle('');
       setDescription('');
       setStatus('idea');
       setColor('gray');
       setTags([]);
+      setImagePreview(null);
     }
     setNewTag('');
+    setImageFile(null);
   }, [editingIdea, isOpen]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+
+    let imageUrl = imagePreview;
+
+    // Handle image upload if there's a new file
+    if (imageFile) {
+      setIsUploading(true);
+      try {
+        const fileName = `idea-${Date.now()}-${imageFile.name}`;
+        const { data, error } = await supabase.storage
+          .from('idea-images')
+          .upload(fileName, imageFile);
+
+        if (error) throw error;
+
+        const { data: urlData } = supabase.storage
+          .from('idea-images')
+          .getPublicUrl(fileName);
+
+        imageUrl = urlData.publicUrl;
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        toast({
+          title: "Upload failed",
+          description: "Failed to upload image. Continuing without image.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploading(false);
+      }
+    }
 
     const ideaData = {
       title: title.trim(),
       description: description.trim(),
       status,
       color,
-      tags
+      tags,
+      ...(imageUrl && { image_url: imageUrl })
     };
 
     if (editingIdea && onUpdate) {
@@ -78,6 +120,88 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
     if (e.key === 'Enter') {
       e.preventDefault();
       addTag();
+    }
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select a valid image file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImageFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const captureScreenshot = async () => {
+    const urls = description.match(/(https?:\/\/[^\s]+)/g);
+    if (!urls || urls.length === 0) {
+      toast({
+        title: "No URL found",
+        description: "Please include a valid URL in the description to capture a screenshot.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsScreenshotting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('capture-screenshot', {
+        body: { url: urls[0] }
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data?.imageUrl) {
+        setImagePreview(data.imageUrl);
+        toast({
+          title: "Screenshot captured! 📸",
+          description: "Website screenshot has been added as your idea image.",
+        });
+      } else {
+        throw new Error(data?.error || 'Failed to capture screenshot');
+      }
+    } catch (error: any) {
+      console.error('Error capturing screenshot:', error);
+      toast({
+        title: "Screenshot failed",
+        description: "Failed to capture screenshot. Please try uploading an image instead.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsScreenshotting(false);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -115,9 +239,67 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe your idea in detail..."
+              placeholder="Describe your idea in detail... (Include URLs for automatic screenshot capture)"
               className="min-h-[120px] text-sm leading-relaxed"
             />
+          </div>
+
+          {/* Image Section */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Image</Label>
+            
+            {imagePreview ? (
+              <div className="relative">
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="w-full h-32 object-cover rounded-lg border"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="flex-1"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {isUploading ? 'Uploading...' : 'Upload Image'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={captureScreenshot}
+                  disabled={isScreenshotting}
+                  className="flex-1"
+                >
+                  <Link className="h-4 w-4 mr-2" />
+                  {isScreenshotting ? 'Capturing...' : 'Screenshot URL'}
+                </Button>
+              </div>
+            )}
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+            <p className="text-xs text-muted-foreground">
+              Upload an image (max 5MB) or include a URL in the description for automatic screenshot
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -206,8 +388,8 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!title.trim()}>
-              {editingIdea ? 'Update Idea' : 'Add Idea'}
+            <Button type="submit" disabled={!title.trim() || isUploading || isScreenshotting}>
+              {isUploading ? 'Uploading...' : isScreenshotting ? 'Capturing...' : editingIdea ? 'Update Idea' : 'Add Idea'}
             </Button>
           </div>
         </form>
