@@ -128,9 +128,39 @@
 @layer base {
   * {
     @apply border-border;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
   }
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Global text wrapping rules */
+  p, div, span, td, th, li, h1, h2, h3, h4, h5, h6 {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  /* Code and URL handling */
+  code, pre, .url-content {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  /* Markdown content */
+  .prose * {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  /* Mobile responsive text */
+  @media (max-width: 640px) {
+    * {
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
   }
 }

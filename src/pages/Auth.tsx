@@ -108,19 +108,21 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4 animate-fade-in">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-primary flex items-center justify-center">
+        <div className="text-center mb-8 animate-scale-in">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-primary flex items-center justify-center shadow-elegant animate-pulse">
             <Lightbulb className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Idea Hub</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2 bg-gradient-primary bg-clip-text text-transparent">
+            Idea Hub
+          </h1>
           <p className="text-muted-foreground">
             Your personal space for organizing and tracking app ideas
           </p>
         </div>
 
-        <Card className="border-border bg-card/50 backdrop-blur-sm">
+        <Card className="border-border bg-card/50 backdrop-blur-sm shadow-elegant hover:shadow-float transition-all duration-300 animate-scale-in">
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -167,7 +169,7 @@ const Auth = () => {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full hover-scale" disabled={loading}>
                     {loading ? "Signing in..." : "Sign In"}
                   </Button>
                 </CardFooter>
@@ -228,7 +230,7 @@ const Auth = () => {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full hover-scale" disabled={loading}>
                     {loading ? "Creating account..." : "Create Account"}
                   </Button>
                 </CardFooter>

@@ -253,33 +253,31 @@ export const PremiumIdeaCard = ({
             {statusStyle.label}
           </Badge>
           
-          {/* Long Press Menu */}
-          {isLongPressed && (
-            <div className="flex gap-1 animate-scale-in">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 hover:bg-white/50"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(idea);
-                }}
-              >
-                <Edit3 className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(idea.id);
-                }}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
+          {/* Action Buttons - Always visible on mobile, hover on desktop */}
+          <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-white/50"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(idea);
+              }}
+            >
+              <Edit3 className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(idea.id);
+              }}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
 
           {/* AI Actions Dropdown */}
           {(settings.auto_image_generation || settings.ai_description_enhancement) && (
@@ -337,24 +335,42 @@ export const PremiumIdeaCard = ({
             <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-em:text-muted-foreground prose-code:text-foreground prose-pre:text-foreground prose-blockquote:text-muted-foreground prose-li:text-muted-foreground overflow-hidden">
               <ReactMarkdown
                 components={{
-                  h1: ({children}) => <h1 className="text-base font-semibold mb-2 text-foreground break-words">{children}</h1>,
-                  h2: ({children}) => <h2 className="text-sm font-semibold mb-1 text-foreground break-words">{children}</h2>,
-                  h3: ({children}) => <h3 className="text-sm font-medium mb-1 text-foreground break-words">{children}</h3>,
+                  h1: ({children}) => <h1 className="text-base font-semibold mb-2 text-foreground break-words overflow-wrap-anywhere">{children}</h1>,
+                  h2: ({children}) => <h2 className="text-sm font-semibold mb-1 text-foreground break-words overflow-wrap-anywhere">{children}</h2>,
+                  h3: ({children}) => <h3 className="text-sm font-medium mb-1 text-foreground break-words overflow-wrap-anywhere">{children}</h3>,
                   p: ({children}) => <p className="text-sm mb-2 text-muted-foreground break-words overflow-wrap-anywhere whitespace-pre-wrap">{children}</p>,
-                  strong: ({children}) => <strong className="font-semibold text-foreground break-words">{children}</strong>,
-                  em: ({children}) => <em className="italic text-muted-foreground break-words">{children}</em>,
-                  code: ({children}) => <code className="bg-muted px-1 py-0.5 rounded text-xs text-foreground break-all">{children}</code>,
-                  blockquote: ({children}) => <blockquote className="border-l-2 border-border pl-2 text-sm text-muted-foreground break-words">{children}</blockquote>,
+                  strong: ({children}) => <strong className="font-semibold text-foreground break-words overflow-wrap-anywhere">{children}</strong>,
+                  em: ({children}) => <em className="italic text-muted-foreground break-words overflow-wrap-anywhere">{children}</em>,
+                  code: ({children}) => <code className="bg-muted px-1 py-0.5 rounded text-xs text-foreground break-all overflow-wrap-anywhere">{children}</code>,
+                  blockquote: ({children}) => <blockquote className="border-l-2 border-border pl-2 text-sm text-muted-foreground break-words overflow-wrap-anywhere">{children}</blockquote>,
                   ul: ({children}) => <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">{children}</ul>,
                   ol: ({children}) => <ol className="list-decimal list-inside text-sm space-y-1 text-muted-foreground">{children}</ol>,
-                  li: ({children}) => <li className="text-sm text-muted-foreground break-words overflow-wrap-anywhere">{children}</li>
+                  li: ({children}) => <li className="text-sm text-muted-foreground break-words overflow-wrap-anywhere">{children}</li>,
+                  a: ({children, href}) => (
+                    <a 
+                      href={href} 
+                      className="text-primary underline bg-primary/10 px-1 py-0.5 rounded break-all" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      {children}
+                    </a>
+                  )
                 }}
               >
                 {truncateDescription(idea.description, 150)}
               </ReactMarkdown>
             </div>
           ) : (
-            <p className="break-words overflow-wrap-anywhere whitespace-pre-wrap">{truncateDescription(idea.description, 150)}</p>
+            <div 
+              className="break-words overflow-wrap-anywhere whitespace-pre-wrap"
+              dangerouslySetInnerHTML={{
+                __html: truncateDescription(idea.description, 150).replace(
+                  /(https?:\/\/[^\s]+)/g, 
+                  '<span class="text-primary bg-primary/10 px-1 py-0.5 rounded break-all">$1</span>'
+                )
+              }}
+            />
           )}
         </div>
 

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, Plus, Tag as TagIcon, Upload, Link, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Plus, Tag as TagIcon, Upload, Link, Trash2, Crop as CropIcon, Save } from 'lucide-react';
 import { Idea, IdeaStatus, IdeaColor, statusConfig, colorConfig } from '@/types/idea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import ReactCrop, { type Crop as CropType, centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 
 interface IdeaFormProps {
   isOpen: boolean;
@@ -30,6 +32,9 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isScreenshotting, setIsScreenshotting] = useState(false);
+  const [showCrop, setShowCrop] = useState(false);
+  const [crop, setCrop] = useState<CropType>();
+  const [imgRef, setImgRef] = useState<HTMLImageElement>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -49,8 +54,10 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
       setTags([]);
       setImagePreview(null);
     }
-    setNewTag('');
+      setNewTag('');
     setImageFile(null);
+    setShowCrop(false);
+    setCrop(undefined);
   }, [editingIdea, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -152,9 +159,122 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
     // Create preview
     const reader = new FileReader();
     reader.onload = (e) => {
-      setImagePreview(e.target?.result as string);
+      const result = e.target?.result as string;
+      setImagePreview(result);
+      setShowCrop(true);
+      
+      // Initialize crop
+      const img = new Image();
+      img.onload = () => {
+        const crop = centerCrop(
+          makeAspectCrop(
+            {
+              unit: '%',
+              width: 90,
+            },
+            16 / 9,
+            img.width,
+            img.height
+          ),
+          img.width,
+          img.height
+        );
+        setCrop(crop);
+      };
+      img.src = result;
     };
     reader.readAsDataURL(file);
+  };
+
+  const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget;
+    setImgRef(e.currentTarget);
+    
+    const crop = centerCrop(
+      makeAspectCrop(
+        {
+          unit: '%',
+          width: 90,
+        },
+        16 / 9,
+        width,
+        height
+      ),
+      width,
+      height
+    );
+    setCrop(crop);
+  }, []);
+
+  const getCroppedImage = useCallback((): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      if (!imgRef || !crop || !imageFile) {
+        reject(new Error('Missing image or crop data'));
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('No 2d context'));
+        return;
+      }
+
+      const scaleX = imgRef.naturalWidth / imgRef.width;
+      const scaleY = imgRef.naturalHeight / imgRef.height;
+
+      canvas.width = crop.width! * scaleX;
+      canvas.height = crop.height! * scaleY;
+
+      ctx.drawImage(
+        imgRef,
+        crop.x! * scaleX,
+        crop.y! * scaleY,
+        crop.width! * scaleX,
+        crop.height! * scaleY,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Canvas is empty'));
+          return;
+        }
+        const file = new File([blob], imageFile.name, { type: imageFile.type });
+        resolve(file);
+      }, imageFile.type);
+    });
+  }, [imgRef, crop, imageFile]);
+
+  const applyCrop = async () => {
+    try {
+      const croppedFile = await getCroppedImage();
+      setImageFile(croppedFile);
+      
+      // Update preview with cropped version
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(croppedFile);
+      
+      setShowCrop(false);
+      toast({
+        title: "Image cropped successfully! ✂️",
+        description: "Your image has been cropped and is ready to use.",
+      });
+    } catch (error) {
+      console.error('Error cropping image:', error);
+      toast({
+        title: "Crop failed",
+        description: "Failed to crop image. Using original instead.",
+        variant: "destructive",
+      });
+      setShowCrop(false);
+    }
   };
 
   const captureScreenshot = async () => {
@@ -200,6 +320,8 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+    setShowCrop(false);
+    setCrop(undefined);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -248,22 +370,71 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
           <div className="space-y-3">
             <Label className="text-sm font-medium">Image</Label>
             
-            {imagePreview ? (
+            {showCrop && imagePreview ? (
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  Crop your image to the desired size:
+                </div>
+                <div className="relative max-h-80 overflow-hidden rounded-lg border">
+                  <ReactCrop
+                    crop={crop}
+                    onChange={(_, percentCrop) => setCrop(percentCrop)}
+                    aspect={16 / 9}
+                    minWidth={100}
+                    minHeight={56}
+                  >
+                    <img
+                      ref={setImgRef}
+                      src={imagePreview}
+                      alt="Crop preview"
+                      onLoad={onImageLoad}
+                      className="max-w-full h-auto"
+                    />
+                  </ReactCrop>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    onClick={applyCrop}
+                    className="flex-1"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Apply Crop
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowCrop(false)}
+                  >
+                    Skip Crop
+                  </Button>
+                </div>
+              </div>
+            ) : imagePreview ? (
               <div className="relative">
                 <img 
                   src={imagePreview} 
                   alt="Preview" 
                   className="w-full h-32 object-cover rounded-lg border"
                 />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={removeImage}
-                  className="absolute top-2 right-2"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowCrop(true)}
+                  >
+                    <CropIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={removeImage}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex gap-2">
@@ -298,7 +469,7 @@ export const IdeaForm = ({ isOpen, onClose, onSubmit, onUpdate, editingIdea }: I
               className="hidden"
             />
             <p className="text-xs text-muted-foreground">
-              Upload an image (max 5MB) or include a URL in the description for automatic screenshot
+              Upload an image (max 5MB), crop it to fit perfectly, or include a URL in the description for automatic screenshot
             </p>
           </div>
 
